@@ -17,6 +17,7 @@ const NAV = [
   { href: "/bulk", label: "Bulk Upload" },
   { href: "/categories", label: "Categories" },
   { href: "/studio", label: "AI Testing Studio" },
+  { href: "/assistant", label: "AI Form Assistant" },
   { href: "/usage", label: "AI Usage" },
   { href: "/settings", label: "Settings & API Keys" },
   { href: "/docs", label: "API Docs" },
