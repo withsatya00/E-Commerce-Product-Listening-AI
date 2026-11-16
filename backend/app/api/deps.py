@@ -48,6 +48,8 @@ async def get_current_user(
         key_record = await verify_api_key(session, api_key_header)
         if not key_record:
             raise AuthError("Invalid or expired API key")
+        # verify_api_key commits, which clears the transaction-local tenant context; restore it
+        await set_tenant_context(session, org_id=key_record.organization_id)
         # Find organization owner to act as the principal user
         owner_member = await session.scalar(
             select(OrganizationMember)

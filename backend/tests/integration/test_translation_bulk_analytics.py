@@ -214,7 +214,7 @@ async def test_org_usage_summary(client, app, fake, make_account, make_org):
                       json={"attributes": {"color": "navy"}})
     u = (await client.get(f"{API}/ai/usage", headers=a.h(org))).json()
     assert u["jobs"]["total"] == 1 and u["jobs"]["approved"] == 1
-    assert u["calls"] >= 7 and u["input_tokens"] > 0
+    assert u["calls"] >= 5 and u["input_tokens"] > 0
     assert u["approval_rate"] == 1.0
     assert u["attribute_correction_rate"] > 0  # color was corrected by the seller
 

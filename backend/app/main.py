@@ -15,6 +15,8 @@ from app.api.v1 import (
     ai_extra,
     auth,
     categories,
+    compliance,
+    developer,
     images,
     international,
     offers,
@@ -142,7 +144,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     for r in (
         auth.router, organizations.router, sellers.router, categories.router,
         categories.admin, admin_api.router, images.router, ai_api.router, ai_extra.router,
-        products.router, offers.router, international.router,
+        products.router, offers.router, international.router, compliance.router, developer.router,
     ):
         app.include_router(r, prefix="/api/v1")
     return app
