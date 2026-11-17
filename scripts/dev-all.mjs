@@ -21,7 +21,9 @@ import { fileURLToPath } from "node:url";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const win = process.platform === "win32";
 const venvPython = (dir) => path.join(root, dir, ".venv", win ? "Scripts/python.exe" : "bin/python");
-const FRONTEND_PORT = Number(process.env.FRONTEND_PORT || 3000);
+const portArgIdx = process.argv.findIndex((a) => a === "--port" || a === "-p");
+const cliPort = portArgIdx !== -1 && process.argv[portArgIdx + 1] ? Number(process.argv[portArgIdx + 1]) : null;
+const FRONTEND_PORT = Number(process.env.FRONTEND_PORT || cliPort || 3000);
 const COLORS = { "listing-api": 36, assistant: 35, frontend: 33 };
 
 function readEnvFile(file) {
@@ -77,7 +79,7 @@ const services = [
     shell: true, // npm is a .cmd shim on Windows
     port: FRONTEND_PORT,
     ready: `http://localhost:${FRONTEND_PORT}`,
-    env: { ASSIST_URL: "http://localhost:8100", ASSIST_API_KEY: assistEnv.ASSIST_API_KEY },
+    env: { PORT: String(FRONTEND_PORT), ASSIST_URL: "http://localhost:8100", ASSIST_API_KEY: assistEnv.ASSIST_API_KEY },
   },
 ];
 
