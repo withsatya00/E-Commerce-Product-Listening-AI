@@ -10,7 +10,12 @@ interface ChatWindowProps {
   apiUrl?: string;
 }
 
-export function ChatWindow({ onClose, apiUrl = "/api/v1/chat" }: ChatWindowProps) {
+export function ChatWindow({ onClose, apiUrl }: ChatWindowProps) {
+  const baseChatUrl =
+    apiUrl ||
+    (typeof window !== "undefined" && process.env.NEXT_PUBLIC_API_URL
+      ? `${process.env.NEXT_PUBLIC_API_URL}/api/v1/chat`
+      : "http://localhost:8000/api/v1/chat");
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: "welcome-1",
@@ -66,15 +71,26 @@ export function ChatWindow({ onClose, apiUrl = "/api/v1/chat" }: ChatWindowProps
     setIsLoading(true);
 
     try {
-      const endpoint = `${apiUrl}/message`;
-      const res = await fetch(endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message: text,
-          session_id: sessionId,
-        }),
-      });
+      let res: Response;
+      try {
+        res = await fetch(`${baseChatUrl}/message`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            message: text,
+            session_id: sessionId,
+          }),
+        });
+      } catch {
+        res = await fetch(`/api/v1/chat/message`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            message: text,
+            session_id: sessionId,
+          }),
+        });
+      }
 
       if (!res.ok) {
         throw new Error(`API returned ${res.status}`);
