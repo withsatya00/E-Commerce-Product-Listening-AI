@@ -53,8 +53,38 @@ async def main():
     print(f"Item: {order.items[0].product_name} (Qty: {order.items[0].quantity})")
     print("✓ Tool functions verified!")
 
+    # Test 5: Out of Scope Guardrails
+    print("\n--- Test 5: Out of Scope Deflection ---")
+    res5 = await agent.chat("python kya hota hai", session_id="test_sess_5")
+    print(f"Reply:\n{res5.reply}")
+    assert "TradeExpress" in res5.reply
+    assert "coding" in res5.reply or "Shopping" in res5.reply
+    print("✓ Out-of-scope query deflected politely!")
+
+    # Test 6: Check Delivery Time (No Order ID clash)
+    print("\n--- Test 6: Check Delivery Time ---")
+    res6 = await agent.chat("Check Delivery Time", session_id="test_sess_6")
+    print(f"Reply:\n{res6.reply}")
+    assert "3 se 7 business days" in res6.reply or "Delivery Timelines" in res6.reply
+    assert res6.order_status is None
+    print("✓ Delivery Time handled properly without asking for Order ID!")
+
+    # Test 7: View Size Guide
+    print("\n--- Test 7: View Size Guide ---")
+    res7 = await agent.chat("View Size Guide", session_id="test_sess_7")
+    print(f"Reply:\n{res7.reply}")
+    assert "Chest 38" in res7.reply
+    print("✓ Size Guide verified!")
+
+    # Test 8: Available Colors
+    print("\n--- Test 8: Available Colors ---")
+    res8 = await agent.chat("Available Colors", session_id="test_sess_8")
+    print(f"Reply:\n{res8.reply}")
+    assert "Solid Black" in res8.reply
+    print("✓ Available Colors verified!")
+
     print("\n==============================================")
-    print("ALL 4 CHATBOT TESTS PASSED COMPLETELY! (0 ERRORS)")
+    print("ALL 8 CHATBOT TESTS PASSED COMPLETELY! (0 ERRORS)")
     print("==============================================")
 
 if __name__ == "__main__":

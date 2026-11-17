@@ -32,7 +32,7 @@ GEMINI_CHAT_TOOLS = [
         "parameters": {
             "type": "OBJECT",
             "properties": {
-                "order_number": {"type": "STRING", "description": "The exact order number provided by the user, e.g. ORD-2026-9021"}
+                "order_number": {"type": "STRING", "description": "The exact order number provided by the user, e.g. ORD-12345"}
             },
             "required": ["order_number"]
         }
