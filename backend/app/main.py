@@ -1,4 +1,17 @@
 import logging
+import sys
+from pathlib import Path
+
+# Ensure project root is in sys.path for standalone modules like chatbot
+_root_dir = Path(__file__).resolve().parent.parent.parent
+if str(_root_dir) not in sys.path:
+    sys.path.insert(0, str(_root_dir))
+
+try:
+    from chatbot.backend.routes import router as chat_router
+except Exception as _chat_err:
+    logging.getLogger("app").warning(f"Chatbot router not loaded: {_chat_err}")
+    chat_router = None
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
@@ -141,10 +154,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             return JSONResponse(status_code=503, content={"status": "unavailable", "database": "down"})
         return JSONResponse(content={"status": "ok", "database": "ok"})
 
-    for r in (
+    routers = [
         auth.router, organizations.router, sellers.router, categories.router,
         categories.admin, admin_api.router, images.router, ai_api.router, ai_extra.router,
         products.router, offers.router, international.router, compliance.router, developer.router,
-    ):
+    ]
+    if chat_router:
+        routers.append(chat_router)
+
+    for r in routers:
         app.include_router(r, prefix="/api/v1")
     return app

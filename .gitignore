@@ -42,3 +42,4 @@ backend/.e2e-storage/
 *.log
 .DS_Store
 Thumbs.db
+.playwright-mcp/
