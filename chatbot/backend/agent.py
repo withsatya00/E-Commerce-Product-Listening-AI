@@ -27,7 +27,12 @@ class ChatbotAgent:
     def __init__(self, api_key: Optional[str] = None):
         self.api_key = api_key if api_key is not None else chatbot_settings.api_key
         self.model = chatbot_settings.model
-        self.client = httpx.AsyncClient(timeout=15.0)
+        # Ultra-low latency HTTP client with Keep-Alive connection pooling
+        self.client = httpx.AsyncClient(
+            timeout=httpx.Timeout(4.5, connect=1.5, read=4.0),
+            limits=httpx.Limits(max_keepalive_connections=20, max_connections=40, keepalive_expiry=60.0),
+            http2=False
+        )
 
     async def chat(
         self,
@@ -133,8 +138,12 @@ class ChatbotAgent:
         if is_policy_query and not quick_suggestions:
             quick_suggestions = ["7-Day Return Policy", "Free Shipping Info", "Payment Modes"]
 
-        # Call real Gemini API if key is configured and not in offline test mode
-        if not offline_mode and self.api_key and len(self.api_key) > 10:
+        # Fast Path: Deterministic store policies, delivery timelines, size guides, and order tracking
+        # These are fixed facts that return in < 5ms without waiting for an external LLM network roundtrip
+        is_fast_path = is_delivery_time_query or is_size_query or is_color_query or is_policy_query or bool(order_match)
+
+        # Call real Gemini API for open-ended product queries and general conversation
+        if not is_fast_path and not offline_mode and self.api_key and len(self.api_key) > 10:
             try:
                 gemini_reply = await self._call_gemini(user_message, matched_products, matched_order)
                 if gemini_reply and len(gemini_reply.strip()) > 5:
@@ -356,7 +365,7 @@ class ChatbotAgent:
         body = {
             "systemInstruction": {"parts": [{"text": CHATBOT_SYSTEM_PROMPT + context_data}]},
             "contents": [{"role": "user", "parts": [{"text": prompt}]}],
-            "generationConfig": {"temperature": 0.3, "maxOutputTokens": 600}
+            "generationConfig": {"temperature": 0.2, "maxOutputTokens": 250}
         }
         res = await self.client.post(url, json=body, headers={"x-goog-api-key": self.api_key})
         if res.status_code == 200:

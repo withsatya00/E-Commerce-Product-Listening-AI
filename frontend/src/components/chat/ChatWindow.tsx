@@ -16,7 +16,7 @@ export function ChatWindow({ onClose, apiUrl }: ChatWindowProps) {
     apiUrl ||
     (typeof window !== "undefined" && process.env.NEXT_PUBLIC_API_URL
       ? `${process.env.NEXT_PUBLIC_API_URL}/api/v1/chat`
-      : "http://localhost:8000/api/v1/chat");
+      : "/api/v1/chat");
 
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
