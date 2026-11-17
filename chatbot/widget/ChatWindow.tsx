@@ -4,6 +4,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { ChatMessage } from "./types";
 import { ProductCard } from "./ProductCard";
 import { OrderTracker } from "./OrderTracker";
+import { FormattedMessage } from "./FormattedMessage";
 
 interface ChatWindowProps {
   onClose: () => void;
@@ -16,17 +17,18 @@ export function ChatWindow({ onClose, apiUrl }: ChatWindowProps) {
     (typeof window !== "undefined" && process.env.NEXT_PUBLIC_API_URL
       ? `${process.env.NEXT_PUBLIC_API_URL}/api/v1/chat`
       : "http://localhost:8000/api/v1/chat");
+
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: "welcome-1",
       role: "assistant",
       content:
-        "Namaste! 🙏 Welcome to **TradeExpress**.\n\nI can help you discover products, check live order delivery status, or explain return & shipping policies. What can I do for you today?",
+        "Namaste! 🙏 Welcome to **TradeExpress**.\n\nI can help you discover products, track live order shipments, or explain return & shipping policies. How can I help you today?",
       quickSuggestions: [
-        "Track ORD-2026-9021",
-        "Black Shirts under ₹1000",
-        "Return Policy",
-        "Wholesale Rates",
+        "📦 Track an Order",
+        "👕 Black Shirts under ₹1000",
+        "🔄 7-Day Return Policy",
+        "💼 Wholesale Bulk Rates",
       ],
       timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
     },
@@ -37,7 +39,6 @@ export function ChatWindow({ onClose, apiUrl }: ChatWindowProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // Generate or restore session ID from sessionStorage
     let savedSess = "";
     try {
       savedSess = sessionStorage.getItem("tx_chat_session_id") || "";
@@ -82,6 +83,7 @@ export function ChatWindow({ onClose, apiUrl }: ChatWindowProps) {
           }),
         });
       } catch {
+        // Fallback through Next.js proxy rewrite
         res = await fetch(`/api/v1/chat/message`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -108,12 +110,12 @@ export function ChatWindow({ onClose, apiUrl }: ChatWindowProps) {
       };
 
       setMessages((prev) => [...prev, botMsg]);
-    } catch (err) {
+    } catch {
       const fallbackMsg: ChatMessage = {
         id: `err_${Date.now()}`,
         role: "assistant",
         content:
-          "Network se connect karne me problem aayi. Please dobara try karein ya hamari customer support team (+91 98765 43210) se contact karein.",
+          "Network se connect karne me problem aayi. Please make sure backend is running on `http://localhost:8000` ya support team (+91 98765 43210) se sampark karein.",
         timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
       };
       setMessages((prev) => [...prev, fallbackMsg]);
@@ -128,78 +130,146 @@ export function ChatWindow({ onClose, apiUrl }: ChatWindowProps) {
         id: `reset_${Date.now()}`,
         role: "assistant",
         content: "Chat cleared! How can I assist you with your shopping or orders?",
-        quickSuggestions: ["Black Shirts under ₹1000", "Track My Order", "Return Policy"],
+        quickSuggestions: [
+          "📦 Track an Order",
+          "👕 Black Shirts under ₹1000",
+          "🔄 7-Day Return Policy",
+          "💼 Wholesale Bulk Rates",
+        ],
         timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
       },
     ]);
   };
 
   return (
-    <div className="flex flex-col h-[560px] w-[370px] sm:w-[400px] bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden font-sans">
+    <div className="flex flex-col h-[580px] w-[370px] sm:w-[410px] bg-white rounded-3xl shadow-2xl border border-slate-200/90 overflow-hidden font-sans ring-1 ring-black/5 animate-in fade-in zoom-in-95 duration-200">
       {/* Header */}
-      <div className="bg-gradient-to-r from-indigo-600 to-indigo-700 p-3.5 text-white flex items-center justify-between shadow-sm shrink-0">
-        <div className="flex items-center gap-2.5">
-          <div className="relative w-8 h-8 rounded-full bg-white/20 backdrop-blur flex items-center justify-center text-base border border-white/30">
+      <div className="bg-gradient-to-r from-indigo-600 via-indigo-700 to-purple-700 px-4 py-3.5 text-white flex items-center justify-between shadow-md shrink-0">
+        <div className="flex items-center gap-3">
+          <div className="relative w-9 h-9 rounded-full bg-white/15 backdrop-blur-md flex items-center justify-center text-lg border border-white/25 shadow-inner">
             🤖
-            <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-400 border-2 border-indigo-700 rounded-full" />
+            <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-400 border-2 border-indigo-700 rounded-full ring-1 ring-emerald-300 animate-pulse" />
           </div>
           <div>
-            <h3 className="font-semibold text-sm leading-tight tracking-tight">TradeExpress AI</h3>
-            <span className="text-[11px] text-indigo-100 flex items-center gap-1">
-              <span>●</span> Online Shopping Assistant
-            </span>
+            <div className="flex items-center gap-1.5">
+              <h3 className="font-bold text-sm tracking-tight text-white">TradeExpress AI</h3>
+              <span className="bg-white/20 text-[10px] font-semibold uppercase px-1.5 py-0.2 rounded text-indigo-100">
+                PRO
+              </span>
+            </div>
+            <p className="text-[11px] text-indigo-100/90 flex items-center gap-1 font-medium">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block" />
+              Online · Typically replies instantly
+            </p>
           </div>
         </div>
 
+        {/* Header Action Buttons */}
         <div className="flex items-center gap-1">
           <button
             onClick={handleClear}
-            title="Clear Chat"
-            className="p-1.5 hover:bg-white/10 rounded-lg text-xs text-indigo-100 transition-colors"
+            title="Reset Chat"
+            className="p-1.5 hover:bg-white/15 active:scale-95 rounded-xl text-white/80 hover:text-white transition-all"
           >
-            🔄
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
           </button>
           <button
             onClick={onClose}
             title="Minimize"
-            className="p-1.5 hover:bg-white/10 rounded-lg text-indigo-100 transition-colors font-bold"
+            className="p-1.5 hover:bg-white/15 active:scale-95 rounded-xl text-white/80 hover:text-white transition-all"
           >
-            ✕
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
           </button>
         </div>
       </div>
 
       {/* Messages Scroll Area */}
-      <div className="flex-1 p-3.5 overflow-y-auto space-y-3.5 bg-slate-50/50">
-        {messages.map((m) => (
+      <div className="flex-1 p-4 overflow-y-auto space-y-4 bg-gradient-to-b from-slate-50/80 to-white">
+        {messages.map((m, mIdx) => (
           <div
             key={m.id}
             className={`flex flex-col ${m.role === "user" ? "items-end" : "items-start"}`}
           >
             <div
-              className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-xs leading-relaxed shadow-sm ${
+              className={`max-w-[88%] rounded-2xl px-4 py-3 text-xs leading-relaxed shadow-xs transition-all ${
                 m.role === "user"
-                  ? "bg-indigo-600 text-white rounded-br-none"
-                  : "bg-white text-slate-800 border border-slate-200/80 rounded-bl-none whitespace-pre-line"
+                  ? "bg-gradient-to-r from-indigo-600 to-indigo-700 text-white rounded-br-xs font-medium shadow-indigo-600/10"
+                  : "bg-white text-slate-800 border border-slate-200/90 rounded-bl-xs shadow-slate-100"
               }`}
             >
-              {m.content}
+              <FormattedMessage content={m.content} isUser={m.role === "user"} />
             </div>
+
+            {/* If welcome message and first load, show 4 quick action cards */}
+            {mIdx === 0 && messages.length === 1 && (
+              <div className="grid grid-cols-2 gap-2 w-full mt-3">
+                <button
+                  onClick={() => handleSend("Track an Order")}
+                  className="flex flex-col items-start p-2.5 bg-white hover:bg-indigo-50/60 border border-slate-200 hover:border-indigo-200 rounded-xl transition-all text-left group shadow-2xs"
+                >
+                  <span className="text-base mb-1">📦</span>
+                  <span className="text-xs font-semibold text-slate-800 group-hover:text-indigo-600">
+                    Track Order
+                  </span>
+                  <span className="text-[10px] text-slate-400">Live courier ETA</span>
+                </button>
+
+                <button
+                  onClick={() => handleSend("Black Shirts under ₹1000")}
+                  className="flex flex-col items-start p-2.5 bg-white hover:bg-indigo-50/60 border border-slate-200 hover:border-indigo-200 rounded-xl transition-all text-left group shadow-2xs"
+                >
+                  <span className="text-base mb-1">👕</span>
+                  <span className="text-xs font-semibold text-slate-800 group-hover:text-indigo-600">
+                    Find Clothes
+                  </span>
+                  <span className="text-[10px] text-slate-400">Under ₹1,000</span>
+                </button>
+
+                <button
+                  onClick={() => handleSend("What is your return policy?")}
+                  className="flex flex-col items-start p-2.5 bg-white hover:bg-indigo-50/60 border border-slate-200 hover:border-indigo-200 rounded-xl transition-all text-left group shadow-2xs"
+                >
+                  <span className="text-base mb-1">🔄</span>
+                  <span className="text-xs font-semibold text-slate-800 group-hover:text-indigo-600">
+                    7-Day Return
+                  </span>
+                  <span className="text-[10px] text-slate-400">Refund details</span>
+                </button>
+
+                <button
+                  onClick={() => handleSend("Tell me about wholesale bulk rates")}
+                  className="flex flex-col items-start p-2.5 bg-white hover:bg-indigo-50/60 border border-slate-200 hover:border-indigo-200 rounded-xl transition-all text-left group shadow-2xs"
+                >
+                  <span className="text-base mb-1">💼</span>
+                  <span className="text-xs font-semibold text-slate-800 group-hover:text-indigo-600">
+                    B2B Wholesale
+                  </span>
+                  <span className="text-[10px] text-slate-400">Tiered savings</span>
+                </button>
+              </div>
+            )}
 
             {/* Embedded Order Tracker Card */}
             {m.orderStatus && (
-              <div className="w-full mt-1.5">
+              <div className="w-full mt-2 animate-in fade-in duration-300">
                 <OrderTracker order={m.orderStatus} />
               </div>
             )}
 
             {/* Embedded Product Cards (Horizontal Carousel) */}
             {m.products && m.products.length > 0 && (
-              <div className="w-full mt-2">
-                <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block mb-1.5">
-                  Suggested Products ({m.products.length})
-                </span>
-                <div className="flex gap-2.5 overflow-x-auto pb-1.5 pt-0.5 scrollbar-thin">
+              <div className="w-full mt-2.5 animate-in fade-in duration-300">
+                <div className="flex items-center justify-between mb-1.5 px-0.5">
+                  <span className="text-[11px] font-bold text-slate-700 tracking-tight">
+                    Recommended Products ({m.products.length})
+                  </span>
+                  <span className="text-[10px] text-indigo-600 font-semibold">Swipe to explore →</span>
+                </div>
+                <div className="flex gap-2.5 overflow-x-auto pb-2 pt-0.5 scrollbar-thin">
                   {m.products.map((p) => (
                     <ProductCard key={p.id} product={p} />
                   ))}
@@ -209,56 +279,70 @@ export function ChatWindow({ onClose, apiUrl }: ChatWindowProps) {
 
             {/* Quick Suggestions Chips */}
             {m.quickSuggestions && m.quickSuggestions.length > 0 && (
-              <div className="flex flex-wrap gap-1.5 mt-2">
+              <div className="flex flex-wrap gap-1.5 mt-2.5">
                 {m.quickSuggestions.map((chip, idx) => (
                   <button
                     key={idx}
                     onClick={() => handleSend(chip)}
-                    className="text-[11px] bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/60 rounded-full px-2.5 py-1 transition-colors font-medium shadow-2xs"
+                    className="text-[11px] bg-white hover:bg-indigo-50 text-indigo-700 hover:text-indigo-800 border border-slate-200/90 hover:border-indigo-300 rounded-full px-3 py-1 transition-all font-medium shadow-2xs active:scale-95 flex items-center gap-1"
                   >
-                    {chip} →
+                    <span>{chip}</span>
+                    <span className="text-indigo-400 font-bold">→</span>
                   </button>
                 ))}
               </div>
             )}
 
-            <span className="text-[9px] text-slate-400 mt-1 px-1">{m.timestamp}</span>
+            <span className="text-[10px] text-slate-400 mt-1 px-1 font-medium">{m.timestamp}</span>
           </div>
         ))}
 
         {isLoading && (
-          <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-3 py-2 w-fit text-xs text-slate-500 shadow-sm">
-            <span className="animate-spin text-indigo-600">⌛</span>
-            <span>AI is searching catalog & orders...</span>
+          <div className="flex items-center gap-2.5 bg-white border border-slate-200/90 rounded-2xl px-4 py-2.5 w-fit text-xs text-slate-600 shadow-sm animate-pulse">
+            <span className="w-2 h-2 rounded-full bg-indigo-600 animate-ping" />
+            <span className="font-medium">Searching catalog & orders...</span>
           </div>
         )}
 
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input Form */}
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          handleSend(input);
-        }}
-        className="p-2.5 bg-white border-t border-slate-200 flex items-center gap-2 shrink-0"
-      >
-        <input
-          type="text"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder="Ask product, price, or Order ID..."
-          className="flex-1 bg-slate-100/70 border border-slate-200 rounded-xl px-3.5 py-2 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all"
-        />
-        <button
-          type="submit"
-          disabled={!input.trim() || isLoading}
-          className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-200 disabled:text-slate-400 text-white rounded-xl p-2.5 transition-colors font-bold text-xs shrink-0 shadow-sm"
+      {/* Input Form & Footer */}
+      <div className="p-3 bg-white border-t border-slate-100 shrink-0">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleSend(input);
+          }}
+          className="flex items-center gap-2 bg-slate-50 border border-slate-200/90 rounded-2xl p-1.5 pl-3.5 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-500/20 focus-within:bg-white transition-all shadow-inner"
         >
-          ➤
-        </button>
-      </form>
+          <input
+            type="text"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder="Type product, budget, or Order ID..."
+            className="flex-1 bg-transparent text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none"
+          />
+          <button
+            type="submit"
+            disabled={!input.trim() || isLoading}
+            className={`rounded-xl p-2 transition-all flex items-center justify-center shrink-0 ${
+              input.trim() && !isLoading
+                ? "bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-md shadow-indigo-600/30 hover:shadow-lg active:scale-95"
+                : "bg-slate-200 text-slate-400 cursor-not-allowed"
+            }`}
+          >
+            <svg className="w-4 h-4 rotate-90" fill="currentColor" viewBox="0 0 20 20">
+              <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
+            </svg>
+          </button>
+        </form>
+
+        <div className="flex items-center justify-center gap-1 text-[10px] text-slate-400 mt-2 font-medium">
+          <span>⚡</span>
+          <span>Powered by TradeExpress AI</span>
+        </div>
+      </div>
     </div>
   );
 }

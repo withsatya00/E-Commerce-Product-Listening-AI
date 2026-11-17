@@ -64,7 +64,7 @@ class ChatbotAgent:
             matched_order = await execute_get_order_status(order_num, db_session)
             quick_suggestions = ["View Invoice", "Delivery Address", "Need Help with Order"]
         elif is_order_query and not order_match:
-            quick_suggestions = ["Track ORD-2026-9021", "How do I find Order ID?", "Return an item"]
+            quick_suggestions = ["How do I find Order ID?", "Need Help with Order", "7-Day Return Policy"]
 
         if is_product_query:
             # Extract price/budget filter supporting English & Hinglish (e.g. 'under 1000', '500 ke andar', '1500 tak')
@@ -142,7 +142,7 @@ class ChatbotAgent:
                 f"aur product search me help kar sakta hoon.\n\nAap mujhse kisi bhi product ka naam, budget, "
                 f"ya apna Order ID pooch sakte hain!"
             )
-            quick_suggestions = ["Show Black Shirts under ₹1000", "Track My Order", "Return Policy", "Wholesale Bulk Rates"]
+            quick_suggestions = ["📦 Track an Order", "👕 Black Shirts under ₹1000", "🔄 7-Day Return Policy", "💼 Wholesale Bulk Rates"]
 
         return ChatResponse(
             session_id=session_id,
