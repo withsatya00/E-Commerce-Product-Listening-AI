@@ -1,6 +1,14 @@
 """Chatbot configuration: store policies, AI settings, and persona defaults."""
 import os
+from pathlib import Path
 from pydantic import BaseModel
+import dotenv
+
+# Load .env from backend or root directory
+root_dir = Path(__file__).resolve().parent.parent.parent
+dotenv.load_dotenv(root_dir / "backend" / ".env")
+dotenv.load_dotenv(root_dir / ".env")
+dotenv.load_dotenv()
 
 
 class StorePolicies(BaseModel):
@@ -27,7 +35,8 @@ class StorePolicies(BaseModel):
 
 
 class ChatbotSettings(BaseModel):
-    model: str = os.getenv("CHATBOT_GEMINI_MODEL", "gemini-2.5-flash-lite")
+    api_key: str = os.getenv("TX_GEMINI_API_KEY") or os.getenv("GEMINI_API_KEY", "")
+    model: str = os.getenv("TX_GEMINI_MODEL") or os.getenv("CHATBOT_GEMINI_MODEL") or "gemini-3.5-flash-lite"
     fallback_model: str = "gpt-4o-mini"
     max_history_turns: int = 10
     temperature: float = 0.3

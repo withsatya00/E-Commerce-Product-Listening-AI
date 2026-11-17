@@ -23,20 +23,61 @@ export function ChatWindow({ onClose, apiUrl }: ChatWindowProps) {
       id: "welcome-1",
       role: "assistant",
       content:
-        "Namaste! 🙏 Welcome to **TradeExpress**.\n\nI can help you discover products, track live order shipments, or explain return & shipping policies. How can I help you today?",
+        "Namaste! 🙏 Welcome to **TradeExpress**.\n\nI can help you discover products, track live shipments, or answer store policies in **English** or **हिंदी / Hinglish**! How can I assist you today?",
       quickSuggestions: [
         "📦 Track an Order",
         "👕 Black Shirts under ₹1000",
         "🔄 7-Day Return Policy",
-        "💼 Wholesale Bulk Rates",
+        "🚚 Check Delivery Time",
       ],
       timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
     },
   ]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isListening, setIsListening] = useState(false);
   const [sessionId, setSessionId] = useState<string>("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const recognitionRef = useRef<any>(null);
+
+  const startVoiceInput = () => {
+    if (typeof window === "undefined") return;
+    const SpeechRecognition =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+      alert("Voice input is not supported in this browser. Please try Chrome or Edge.");
+      return;
+    }
+
+    if (isListening) {
+      recognitionRef.current?.stop();
+      setIsListening(false);
+      return;
+    }
+
+    try {
+      const recognition = new SpeechRecognition();
+      recognition.lang = "en-IN";
+      recognition.continuous = false;
+      recognition.interimResults = false;
+
+      recognition.onstart = () => setIsListening(true);
+      recognition.onend = () => setIsListening(false);
+      recognition.onerror = () => setIsListening(false);
+      recognition.onresult = (event: any) => {
+        const transcript = event.results[0][0].transcript;
+        if (transcript) {
+          setInput(transcript);
+        }
+      };
+
+      recognitionRef.current = recognition;
+      recognition.start();
+    } catch {
+      setIsListening(false);
+    }
+  };
 
   useEffect(() => {
     let savedSess = "";
@@ -314,15 +355,33 @@ export function ChatWindow({ onClose, apiUrl }: ChatWindowProps) {
             e.preventDefault();
             handleSend(input);
           }}
-          className="flex items-center gap-2 bg-slate-50 border border-slate-200/90 rounded-2xl p-1.5 pl-3.5 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-500/20 focus-within:bg-white transition-all shadow-inner"
+          className="flex items-center gap-1.5 bg-slate-50 border border-slate-200/90 rounded-2xl p-1.5 pl-3 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-500/20 focus-within:bg-white transition-all shadow-inner"
         >
           <input
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Type product, budget, or Order ID..."
+            placeholder={isListening ? "Listening... speak now" : "Ask in English or Hindi / Order ID..."}
             className="flex-1 bg-transparent text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none"
           />
+
+          {/* Voice Search (Mic) Button */}
+          <button
+            type="button"
+            onClick={startVoiceInput}
+            title={isListening ? "Stop listening" : "Voice search (Hindi/English)"}
+            className={`p-1.5 rounded-xl transition-all shrink-0 flex items-center justify-center ${
+              isListening
+                ? "bg-rose-500 text-white animate-pulse shadow-sm"
+                : "text-slate-400 hover:text-indigo-600 hover:bg-indigo-50"
+            }`}
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+            </svg>
+          </button>
+
+          {/* Send Button */}
           <button
             type="submit"
             disabled={!input.trim() || isLoading}

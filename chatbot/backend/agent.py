@@ -25,9 +25,9 @@ log = logging.getLogger("chatbot")
 
 class ChatbotAgent:
     def __init__(self, api_key: Optional[str] = None):
-        self.api_key = api_key if api_key is not None else os.getenv("GEMINI_API_KEY", "")
+        self.api_key = api_key if api_key is not None else chatbot_settings.api_key
         self.model = chatbot_settings.model
-        self.client = httpx.AsyncClient(timeout=5.0)
+        self.client = httpx.AsyncClient(timeout=15.0)
 
     async def chat(
         self,
@@ -42,6 +42,16 @@ class ChatbotAgent:
         matched_order: Optional[OrderTrackingResult] = None
         quick_suggestions: List[str] = []
         offline_mode = os.getenv("TX_OFFLINE", "0") == "1"
+
+        # Language Detection: English vs Hindi/Hinglish
+        hindi_markers = [
+            "kya", "hai", "hain", "kahan", "kaise", "dikhao", "batao", "chahiye", "kitne",
+            "andar", "tak", "rupaye", "mera", "meri", "mere", "aayega", "milega", "hoga",
+            "nahi", "kuch", "badhiya", "namaste", "pranam", "shukriya", "bhai", "yaar",
+            "wala", "wali", "wale", "bhejo", "paas", "dost", "dikhaye", "sasta", "mehenga"
+        ]
+        is_hindi = any(re.search(rf"\b{re.escape(w)}\b", msg_lower) for w in hindi_markers)
+        is_english = not is_hindi
 
         # 1. Order tracking detection (exact ID like ORD-10294 or numeric 5-12 digits)
         order_match = re.search(r"\b(ORD[-_][A-Za-z0-9-_]+|\b\d{5,12}\b)\b", user_message, re.IGNORECASE)
@@ -127,18 +137,22 @@ class ChatbotAgent:
         if not offline_mode and self.api_key and len(self.api_key) > 10:
             try:
                 gemini_reply = await self._call_gemini(user_message, matched_products, matched_order)
-                if gemini_reply:
+                if gemini_reply and len(gemini_reply.strip()) > 5:
+                    default_chips = (
+                        ["Explore Casual Shirts", "Track Order", "Return Policy"] if is_english
+                        else ["👕 Black Shirts under ₹1000", "📦 Track an Order", "🔄 7-Day Return Policy"]
+                    )
                     return ChatResponse(
                         session_id=session_id,
-                        reply=gemini_reply,
+                        reply=gemini_reply.strip(),
                         products=matched_products,
                         order_status=matched_order,
-                        quick_suggestions=quick_suggestions or ["Explore Casual Shirts", "Track Order", "Return Policy"]
+                        quick_suggestions=quick_suggestions or default_chips
                     )
             except Exception as exc:
                 log.warning(f"Gemini call fallback: {exc}")
 
-        # Intelligent Fallback Response Formulation (Offline / Fast)
+        # Intelligent Fallback Response Formulation (Offline / Fast) - Bilingual Support
         reply_parts = []
         if matched_order:
             reply_parts.append(
@@ -149,80 +163,169 @@ class ChatbotAgent:
                 f"• **Total Amount:** ₹{matched_order.total:.2f} ({matched_order.payment_status})"
             )
         elif is_order_tracking_query and not order_match:
-            reply_parts.append(
-                "Aapka order track karne ke liye please apna **Order Number** (jaise `ORD-12345`) yahan share karein. "
-                "Main turant live carrier tracking aur delivery ETA check karke bata dunga!"
-            )
+            if is_english:
+                reply_parts.append(
+                    "To track your order, please share your **Order Number** (e.g. `ORD-12345`) here. "
+                    "I will check live carrier tracking and estimated delivery right away!"
+                )
+                quick_suggestions = ["How do I find Order ID?", "Need Help with Order", "7-Day Return Policy"]
+            else:
+                reply_parts.append(
+                    "Aapka order track karne ke liye please apna **Order Number** (jaise `ORD-12345`) yahan share karein. "
+                    "Main turant live carrier tracking aur delivery ETA check karke bata dunga!"
+                )
+                quick_suggestions = ["How do I find Order ID?", "Need Help with Order", "7-Day Return Policy"]
         elif is_delivery_time_query:
-            reply_parts.append(
-                "🚚 **TradeExpress Delivery Timelines:**\n\n"
-                "• **Standard Delivery:** Pure India me **3 se 7 business days** me delivery hoti hai.\n"
-                "• **Express Delivery:** Metro cities (Delhi NCR, Mumbai, Bengaluru, Hyderabad, etc.) me **1 se 3 business days** me deliver ho jata hai.\n"
-                "• **Shipping Charges:** ₹999 ya usse jyada ke orders par **Free Delivery** hai! (₹999 se kam par flat ₹49 fee)."
-            )
+            if is_english:
+                reply_parts.append(
+                    "🚚 **TradeExpress Delivery Timelines:**\n\n"
+                    "• **Standard Delivery:** Delivered across India within **3 to 7 business days**.\n"
+                    "• **Express Delivery:** Delivered to metro cities (Delhi NCR, Mumbai, Bengaluru, etc.) within **1 to 3 business days**.\n"
+                    "• **Shipping Charges:** **Free Delivery** on orders above ₹999! (A flat ₹49 fee applies for orders below ₹999)."
+                )
+                quick_suggestions = ["👕 Black Shirts under ₹1000", "📦 Track an Order", "💳 Payment Modes"]
+            else:
+                reply_parts.append(
+                    "🚚 **TradeExpress Delivery Timelines:**\n\n"
+                    "• **Standard Delivery:** Pure India me **3 se 7 business days** me delivery hoti hai.\n"
+                    "• **Express Delivery:** Metro cities (Delhi NCR, Mumbai, Bengaluru, Hyderabad, etc.) me **1 se 3 business days** me deliver ho jata hai.\n"
+                    "• **Shipping Charges:** ₹999 ya usse jyada ke orders par **Free Delivery** hai! (₹999 se kam par flat ₹49 fee)."
+                )
+                quick_suggestions = ["👕 Black Shirts under ₹1000", "📦 Track an Order", "💳 Payment Modes"]
         elif is_size_query:
-            reply_parts.append(
-                "👕 **TradeExpress Apparel Size Guide (Men's Regular Fit):**\n\n"
-                "• **S (Small):** Chest 38 inches | Length 28 inches\n"
-                "• **M (Medium):** Chest 40 inches | Length 29 inches\n"
-                "• **L (Large):** Chest 42 inches | Length 30 inches\n"
-                "• **XL (Extra Large):** Chest 44 inches | Length 31 inches\n"
-                "• **XXL:** Chest 46 inches | Length 31.5 inches\n\n"
-                "💡 *Tip: Hamare cotton aur oxford casual shirts true to size aate hain. Relaxed fitting ke liye aap ek size bada prefer kar sakte hain.*"
-            )
+            if is_english:
+                reply_parts.append(
+                    "👕 **TradeExpress Apparel Size Guide (Men's Regular Fit):**\n\n"
+                    "• **S (Small):** Chest 38 inches | Length 28 inches\n"
+                    "• **M (Medium):** Chest 40 inches | Length 29 inches\n"
+                    "• **L (Large):** Chest 42 inches | Length 30 inches\n"
+                    "• **XL (Extra Large):** Chest 44 inches | Length 31 inches\n"
+                    "• **XXL:** Chest 46 inches | Length 31.5 inches\n\n"
+                    "💡 *Tip: Our cotton and oxford shirts fit true to size. For a relaxed fit, we recommend selecting one size up.*"
+                )
+                quick_suggestions = ["👕 Black Shirts under ₹1000", "🚚 Check Delivery Time", "🔄 7-Day Return Policy"]
+            else:
+                reply_parts.append(
+                    "👕 **TradeExpress Apparel Size Guide (Men's Regular Fit):**\n\n"
+                    "• **S (Small):** Chest 38 inches | Length 28 inches\n"
+                    "• **M (Medium):** Chest 40 inches | Length 29 inches\n"
+                    "• **L (Large):** Chest 42 inches | Length 30 inches\n"
+                    "• **XL (Extra Large):** Chest 44 inches | Length 31 inches\n"
+                    "• **XXL:** Chest 46 inches | Length 31.5 inches\n\n"
+                    "💡 *Tip: Hamare cotton aur oxford casual shirts true to size aate hain. Relaxed fitting ke liye aap ek size bada prefer kar sakte hain.*"
+                )
+                quick_suggestions = ["👕 Black Shirts under ₹1000", "🚚 Check Delivery Time", "🔄 7-Day Return Policy"]
         elif is_color_query:
-            reply_parts.append(
-                "🎨 **Available Color Options:**\n\n"
-                "Hamare catalog me shirts in popular colors me available hain:\n"
-                "• **Solid Black** (Black Cotton Blend Regular Fit) — ₹899\n"
-                "• **Navy Blue** (100% Combed Cotton Casual) — ₹999\n"
-                "• **Classic White** (Premium Oxford Formal) — ₹1,199\n"
-                "• **Bio-Washed Black** (Everyday Slim Fit) — ₹449\n\n"
-                "Aap kisi bhi color ka naam likh kar search kar sakte hain (e.g. *'Show Navy Blue shirts'* ya *'White shirt under 1200'*)!"
-            )
+            if is_english:
+                reply_parts.append(
+                    "🎨 **Available Color Options:**\n\n"
+                    "Our shirt catalog features the following popular colors:\n"
+                    "• **Solid Black** (Black Cotton Blend Regular Fit) — ₹899\n"
+                    "• **Navy Blue** (100% Combed Cotton Casual) — ₹999\n"
+                    "• **Classic White** (Premium Oxford Formal) — ₹1,199\n"
+                    "• **Bio-Washed Black** (Everyday Slim Fit) — ₹449\n\n"
+                    "You can search by specific color (e.g. *'Show Navy Blue shirts'* or *'White shirt under 1200'*)!"
+                )
+                quick_suggestions = ["Solid Black Shirt", "Navy Blue Shirt", "Classic White Shirt"]
+            else:
+                reply_parts.append(
+                    "🎨 **Available Color Options:**\n\n"
+                    "Hamare catalog me shirts in popular colors me available hain:\n"
+                    "• **Solid Black** (Black Cotton Blend Regular Fit) — ₹899\n"
+                    "• **Navy Blue** (100% Combed Cotton Casual) — ₹999\n"
+                    "• **Classic White** (Premium Oxford Formal) — ₹1,199\n"
+                    "• **Bio-Washed Black** (Everyday Slim Fit) — ₹449\n\n"
+                    "Aap kisi bhi color ka naam likh kar search kar sakte hain (e.g. *'Show Navy Blue shirts'* ya *'White shirt under 1200'*)!"
+                )
+                quick_suggestions = ["Solid Black Shirt", "Navy Blue Shirt", "Classic White Shirt"]
         elif is_out_of_scope:
-            reply_parts.append(
-                "Maaf kijiye! 🙏 Main **TradeExpress Shopping & Order Assistant** hoon.\n\n"
-                "Main sirf hamare store ke **products, live pricing, order tracking, shipping aur return policies** se jude sawaalon me madad kar sakta hoon. Main general knowledge, coding ya cooking/recipes me assist nahi kar sakta.\n\n"
-                "Kya aapko TradeExpress par koi product search karna hai ya apna order track karna hai?"
-            )
-            quick_suggestions = ["👕 Black Shirts under ₹1000", "📦 Track an Order", "🔄 7-Day Return Policy", "🚚 Check Delivery Time"]
+            if is_english:
+                reply_parts.append(
+                    "I apologize! 🙏 I am the **TradeExpress Shopping & Order Assistant**.\n\n"
+                    "I can only help with questions regarding our store's **products, live pricing, order tracking, delivery timelines, and return policies**. I cannot assist with coding, recipes, or general knowledge.\n\n"
+                    "Would you like to search for a product or track an order on TradeExpress?"
+                )
+                quick_suggestions = ["👕 Black Shirts under ₹1000", "📦 Track an Order", "🔄 7-Day Return Policy", "🚚 Check Delivery Time"]
+            else:
+                reply_parts.append(
+                    "Maaf kijiye! 🙏 Main **TradeExpress Shopping & Order Assistant** hoon.\n\n"
+                    "Main sirf hamare store ke **products, live pricing, order tracking, shipping aur return policies** se jude sawaalon me madad kar sakta hoon. Main general knowledge, coding ya cooking/recipes me assist nahi kar sakta.\n\n"
+                    "Kya aapko TradeExpress par koi product search karna hai ya apna order track karna hai?"
+                )
+                quick_suggestions = ["👕 Black Shirts under ₹1000", "📦 Track an Order", "🔄 7-Day Return Policy", "🚚 Check Delivery Time"]
         elif is_greeting:
-            reply_parts.append(
-                "Namaste! 🙏 Welcome to **TradeExpress**.\n\n"
-                "Main aapka personal shopping assistant hoon. Main products dhundhne, live order track karne, aur return/shipping policies batane me help kar sakta hoon. Aaj main aapki kya madad kar sakta hoon?"
-            )
-            quick_suggestions = ["📦 Track an Order", "👕 Black Shirts under ₹1000", "🔄 7-Day Return Policy", "💼 Wholesale Bulk Rates"]
+            if is_english:
+                reply_parts.append(
+                    "Hello! 🙏 Welcome to **TradeExpress**.\n\n"
+                    "I am your personal shopping assistant. I can help you discover products, track live shipments, or explain return & shipping policies. How can I help you today?"
+                )
+                quick_suggestions = ["📦 Track an Order", "👕 Black Shirts under ₹1000", "🔄 7-Day Return Policy", "💼 Wholesale Bulk Rates"]
+            else:
+                reply_parts.append(
+                    "Namaste! 🙏 Welcome to **TradeExpress**.\n\n"
+                    "Main aapka personal shopping assistant hoon. Main products dhundhne, live order track karne, aur return/shipping policies batane me help kar sakta hoon. Aaj main aapki kya madad kar sakta hoon?"
+                )
+                quick_suggestions = ["📦 Track an Order", "👕 Black Shirts under ₹1000", "🔄 7-Day Return Policy", "💼 Wholesale Bulk Rates"]
         elif matched_products:
             matched_budget = [p for p in matched_products if max_price and p.price <= max_price]
-            if max_price and matched_budget:
+            if is_english:
+                if max_price and matched_budget:
+                    reply_parts.append(
+                        f"We found great options within your budget of **₹{int(max_price)}**! "
+                        f"Check out the photos, real prices (₹), and available sizes in the cards below:"
+                    )
+                elif max_price and not matched_budget:
+                    min_avail = min(p.price for p in matched_products)
+                    reply_parts.append(
+                        f"We couldn't find an exact match under ₹{int(max_price)}, but our best value quality option "
+                        f"starts at **₹{int(min_avail)}**. Here are our top recommendations:"
+                    )
+                else:
+                    reply_parts.append(
+                        "Based on your preferences, here are our top recommendations! You can review images, "
+                        "real prices (₹), and sizes in the cards below:"
+                    )
+            else:
+                if max_price and matched_budget:
+                    reply_parts.append(
+                        f"Aapke **₹{int(max_price)}** budget ke andar humne best options dhundh liye hain! "
+                        f"Niche diye gaye cards me aap photos, real price (₹), aur available sizes check kar sakte hain:"
+                    )
+                elif max_price and not matched_budget:
+                    min_avail = min(p.price for p in matched_products)
+                    reply_parts.append(
+                        f"Filhaal ₹{int(max_price)} ke andar direct match nahi mila, lekin sabse affordable best quality option "
+                        f"**₹{int(min_avail)}** se available hai. Niche aap closest recommendations dekh sakte hain:"
+                    )
+                else:
+                    reply_parts.append(
+                        "Aapki pasand ke hisaab se humne top recommendations dhundhi hain! Niche diye gaye cards me aap photos, "
+                        "real price (₹), aur available sizes check kar sakte hain:"
+                    )
+        elif is_policy_query:
+            policy_text = execute_get_store_policy(msg_lower)
+            if is_english:
                 reply_parts.append(
-                    f"Aapke **₹{int(max_price)}** budget ke andar humne best options dhundh liye hain! "
-                    f"Niche diye gaye cards me aap photos, real price (₹), aur available sizes check kar sakte hain:"
-                )
-            elif max_price and not matched_budget:
-                min_avail = min(p.price for p in matched_products)
-                reply_parts.append(
-                    f"Filhaal ₹{int(max_price)} ke andar direct match nahi mila, lekin sabse affordable best quality option "
-                    f"**₹{int(min_avail)}** se available hai. Niche aap closest recommendations dekh sakte hain:"
+                    f"ℹ️ **TradeExpress Policy:**\n{policy_text}\n\nPlease let me know if you need more details!"
                 )
             else:
                 reply_parts.append(
-                    "Aapki pasand ke hisaab se humne top recommendations dhundhi hain! Niche diye gaye cards me aap photos, "
-                    "real price (₹), aur available sizes check kar sakte hain:"
+                    f"ℹ️ **TradeExpress Policy:**\n{policy_text}\n\nAgar aapko iske alawa koi specific help chahiye toh batayein!"
                 )
-        elif is_policy_query:
-            policy_text = execute_get_store_policy(msg_lower)
-            reply_parts.append(
-                f"ℹ️ **TradeExpress Policy:**\n{policy_text}\n\nAgar aapko iske alawa koi specific help chahiye toh batayein!"
-            )
         else:
-            reply_parts.append(
-                f"Namaste! Main **TradeExpress AI Assistant** hoon. Main aapki shopping, order tracking, "
-                f"aur product search me help kar sakta hoon.\n\nAap mujhse kisi bhi product ka naam, budget, "
-                f"ya apna Order ID pooch sakte hain!"
-            )
-            quick_suggestions = ["📦 Track an Order", "👕 Black Shirts under ₹1000", "🔄 7-Day Return Policy", "💼 Wholesale Bulk Rates"]
+            if is_english:
+                reply_parts.append(
+                    f"Hello! I am the **TradeExpress AI Assistant**. I can help you with shopping, order tracking, "
+                    f"and product discovery.\n\nYou can ask about any product, price budget, or your Order ID!"
+                )
+                quick_suggestions = ["📦 Track an Order", "👕 Black Shirts under ₹1000", "🔄 7-Day Return Policy", "💼 Wholesale Bulk Rates"]
+            else:
+                reply_parts.append(
+                    f"Namaste! Main **TradeExpress AI Assistant** hoon. Main aapki shopping, order tracking, "
+                    f"aur product search me help kar sakta hoon.\n\nAap mujhse kisi bhi product ka naam, budget, "
+                    f"ya apna Order ID pooch sakte hain!"
+                )
+                quick_suggestions = ["📦 Track an Order", "👕 Black Shirts under ₹1000", "🔄 7-Day Return Policy", "💼 Wholesale Bulk Rates"]
 
         return ChatResponse(
             session_id=session_id,
@@ -238,7 +341,7 @@ class ChatbotAgent:
         products: List[ProductCardItem],
         order: Optional[OrderTrackingResult]
     ) -> str:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.model}:generateContent"
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.model}:generateContent?key={self.api_key}"
         context_data = ""
         if products:
             context_data += "\nAvailable catalog matches for query:\n" + "\n".join(

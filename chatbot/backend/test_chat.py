@@ -83,8 +83,24 @@ async def main():
     assert "Solid Black" in res8.reply
     print("✓ Available Colors verified!")
 
+    # Test 9: English Query Language Matching
+    print("\n--- Test 9: English Query Response ---")
+    res9 = await agent.chat("What is your shipping time and return policy?", session_id="test_sess_9")
+    print(f"Reply:\n{res9.reply}")
+    assert "business days" in res9.reply.lower() or "return" in res9.reply.lower()
+    assert "aapka" not in res9.reply.lower() and "hoga" not in res9.reply.lower()
+    print("✓ English language matching verified!")
+
+    # Test 10: Hindi / Hinglish Query Language Matching
+    print("\n--- Test 10: Hindi / Hinglish Query Response ---")
+    res10 = await agent.chat("500 ke andar black shirt dikhao", session_id="test_sess_10")
+    print(f"Reply:\n{res10.reply}")
+    assert "budget" in res10.reply.lower() or "best" in res10.reply.lower() or "humne" in res10.reply.lower()
+    assert len(res10.products) > 0
+    print("✓ Hindi language matching verified!")
+
     print("\n==============================================")
-    print("ALL 8 CHATBOT TESTS PASSED COMPLETELY! (0 ERRORS)")
+    print("ALL 10 CHATBOT TESTS PASSED COMPLETELY! (0 ERRORS)")
     print("==============================================")
 
 if __name__ == "__main__":
