@@ -3,9 +3,6 @@ import os
 import sys
 from pathlib import Path
 
-if sys.platform == "win32":
-    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
-
 root = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(root / "backend"))
 sys.path.insert(0, str(root))
@@ -45,13 +42,42 @@ async def main():
     assert "return" in res3.reply.lower() or "days" in res3.reply.lower()
     print("✓ Policy lookup verified!")
 
-    # Test 4: Tool execution
-    print("\n--- Test 4: Direct Tool Functions ---")
-    order = await execute_get_order_status("ORD-998811")
-    assert order.order_number == "ORD-998811"
-    assert len(order.items) > 0
-    print(f"Item: {order.items[0].product_name} (Qty: {order.items[0].quantity})")
-    print("✓ Tool functions verified!")
+    # Test 4: Tool execution & Non-existent Order Lookup
+    print("\n--- Test 4: Demo vs Non-Existent Order Lookup ---")
+    order_found = await execute_get_order_status("ORD-2026-9021")
+    assert order_found is not None
+    assert order_found.order_number == "ORD-2026-9021"
+    assert len(order_found.items) > 0
+    print(f"Active Order Verified: #{order_found.order_number} ({order_found.order_status})")
+
+    # Non-existent/unplaced order returns None
+    order_missing = await execute_get_order_status("ORD-998811")
+    assert order_missing is None
+    print("Non-existent/unplaced order correctly returned None!")
+
+    # Verify agent response for unplaced order
+    res4 = await agent.chat("Mera order ORD-998811 kahan pahuncha?", session_id="test_sess_4")
+    print(f"Unplaced Order Agent Reply:\n{res4.reply}")
+    assert "Record Nahi Mila" in res4.reply or "Not Found" in res4.reply
+    assert res4.order_status is None
+    print("✓ Realistic unplaced order handling verified!")
+
+    # Test 4B: Size Exchange / Fit Question (Should NOT return shirt cards)
+    print("\n--- Test 4B: Size Fit & Exchange Query ---")
+    res_fit = await agent.chat("Agar shirt size fit na ho toh return ya exchange kaise hoga?", session_id="test_sess_fit")
+    print(f"Fit reply:\n{res_fit.reply}")
+    assert len(res_fit.products) == 0, "Should NOT recommend products to buy on a return/exchange query!"
+    assert "exchange" in res_fit.reply.lower() or "replacement" in res_fit.reply.lower() or "return" in res_fit.reply.lower()
+    print("✓ Size exchange correctly routes to policy, not product search!")
+
+    # Test 4C: Party Wear Search
+    print("\n--- Test 4C: Party Wear Search Under 1500 ---")
+    res_party = await agent.chat("1500 tak me best party wear", session_id="test_sess_party")
+    print(f"Party wear products count: {len(res_party.products)}")
+    assert len(res_party.products) > 0
+    assert any("party" in p.name.lower() or "kurta" in p.name.lower() or "satin" in p.name.lower() for p in res_party.products)
+    print(f"Top Party item: {res_party.products[0].name} (₹{res_party.products[0].price})")
+    print("✓ Party wear catalog search verified!")
 
     # Test 5: Out of Scope Guardrails
     print("\n--- Test 5: Out of Scope Deflection ---")
@@ -102,6 +128,7 @@ async def main():
     print("\n==============================================")
     print("ALL 10 CHATBOT TESTS PASSED COMPLETELY! (0 ERRORS)")
     print("==============================================")
+    await agent.client.aclose()
 
 if __name__ == "__main__":
     asyncio.run(main())

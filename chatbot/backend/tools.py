@@ -121,6 +121,32 @@ SAMPLE_PRODUCTS: List[ProductCardItem] = [
         rating=4.7,
         variants=[{"type": "Size", "options": ["M", "L", "XL"]}]
     ),
+    ProductCardItem(
+        id="prod-006",
+        name="Men's Premium Black Satin Party Wear Shirt",
+        slug="mens-black-satin-party-wear-shirt",
+        sku="SHIRT-SAT-BLK-006",
+        price=1299.0,
+        currency="INR",
+        photo="/api/v1/images/sample-shirt.jpg",
+        stock=45,
+        category_slug="mens-clothing",
+        rating=4.9,
+        variants=[{"type": "Size", "options": ["M", "L", "XL"]}]
+    ),
+    ProductCardItem(
+        id="prod-007",
+        name="Men's Emerald Silk Blend Festive Party Kurta",
+        slug="mens-silk-blend-festive-party-kurta",
+        sku="KURTA-SLK-EMR-007",
+        price=1449.0,
+        currency="INR",
+        photo="/api/v1/images/sample-shirt.jpg",
+        stock=35,
+        category_slug="mens-clothing",
+        rating=4.8,
+        variants=[{"type": "Size", "options": ["S", "M", "L", "XL"]}]
+    ),
 ]
 
 
@@ -164,6 +190,9 @@ async def execute_search_products(
     if not results:
         results = list(SAMPLE_PRODUCTS)
 
+    # Detect party/festive intent
+    is_party_query = any(k in q_lower for k in ["party", "festive", "kurta", "wedding", "function", "celebration", "satin"])
+
     # Detect color from query if not explicitly passed
     color_in_query = None
     for c in ["black", "blue", "navy", "white", "red", "green", "grey", "gray"]:
@@ -176,6 +205,10 @@ async def execute_search_products(
     filtered = []
     for item in results:
         name_lower = item.name.lower()
+        if is_party_query:
+            if not any(pk in name_lower for pk in ["party", "festive", "kurta", "satin"]):
+                continue
+
         if target_color and target_color not in name_lower:
             # Check if color is in variants
             has_color_variant = False
@@ -202,37 +235,21 @@ async def execute_search_products(
     return closest[:3] if closest else results[:3]
 
 
-async def execute_get_order_status(
-    order_number: str,
-    db_session: Any = None
-) -> OrderTrackingResult:
-    """Fetch live order tracking status matching TradeExpress Order schema."""
-    cleaned_num = order_number.strip().upper()
-    
-    # Calculate progress percentage based on status
-    status_map = {
-        "ORDER_PLACED": 25,
-        "PROCESSING": 40,
-        "SHIPPED": 65,
-        "OUT_FOR_DELIVERY": 85,
-        "DELIVERED": 100,
-        "CANCELLED": 0
-    }
-
-    # Return structured live tracking object matching user's exact schema
-    return OrderTrackingResult(
-        order_number=cleaned_num,
+# Realistic Active Demo Orders Registry
+DEMO_ORDERS: Dict[str, OrderTrackingResult] = {
+    "ORD-2026-9021": OrderTrackingResult(
+        order_number="ORD-2026-9021",
         buyer_name="Satya Narayan",
         order_status="SHIPPED",
         payment_status="PAID",
-        shipping_method="Standard Express",
+        shipping_method="Delhivery Surface Express",
         shipping_eta="Estimated delivery by tomorrow, 6:00 PM",
-        tracking_number=f"EXP-{cleaned_num.replace('ORD-', '')}-99",
+        tracking_number="EXP-2026-9021-99",
         carrier_name="Delhivery Express",
         total=899.0,
         currency="INR",
         created_at="Nov 15, 2026",
-        progress_percentage=status_map.get("SHIPPED", 65),
+        progress_percentage=65,
         items=[
             OrderItemSummary(
                 product_name="Solid Black Cotton Blend Regular Fit Men's Casual Shirt",
@@ -244,14 +261,95 @@ async def execute_get_order_status(
                 variant={"Color": "Black", "Size": "L"}
             )
         ]
-    )
+    ),
+    "ORD-2026-1002": OrderTrackingResult(
+        order_number="ORD-2026-1002",
+        buyer_name="Satya Narayan",
+        order_status="DELIVERED",
+        payment_status="PAID",
+        shipping_method="BlueDart Air Express",
+        shipping_eta="Delivered on Nov 14, 2026",
+        tracking_number="BD-992144-IN",
+        carrier_name="BlueDart Express",
+        total=999.0,
+        currency="INR",
+        created_at="Nov 10, 2026",
+        progress_percentage=100,
+        items=[
+            OrderItemSummary(
+                product_name="Men's Navy Blue 100% Combed Cotton Casual Shirt",
+                product_sku="SHIRT-COT-NVY-002",
+                product_photo="/api/v1/images/sample-shirt.jpg",
+                quantity=1,
+                unit_price=999.0,
+                line_total=999.0,
+                variant={"Color": "Navy Blue", "Size": "M"}
+            )
+        ]
+    ),
+}
+
+
+async def execute_get_order_status(
+    order_number: str,
+    db_session: Any = None
+) -> Optional[OrderTrackingResult]:
+    """Fetch live order tracking status. Returns None if order does not exist or has not been placed."""
+    cleaned_num = order_number.strip().upper().lstrip("#")
+    
+    # 1. Check live database if session is provided
+    if db_session:
+        try:
+            from sqlalchemy import select
+            from app.models.order import Order as DbOrder
+            stmt = select(DbOrder).where(DbOrder.order_number == cleaned_num)
+            res = await db_session.execute(stmt)
+            db_order = res.scalars().first()
+            if db_order:
+                return OrderTrackingResult(
+                    order_number=db_order.order_number,
+                    buyer_name=getattr(db_order, "buyer_name", "Customer"),
+                    order_status=getattr(db_order, "order_status", "PROCESSING"),
+                    payment_status=getattr(db_order, "payment_status", "PAID"),
+                    shipping_method=getattr(db_order, "shipping_method", "Standard"),
+                    shipping_eta="Delivery in 2-4 business days",
+                    tracking_number=getattr(db_order, "tracking_number", "TRK-001"),
+                    carrier_name=getattr(db_order, "carrier_name", "Delhivery Express"),
+                    total=float(getattr(db_order, "total", 0.0)),
+                    currency="INR",
+                    created_at=str(getattr(db_order, "created_at", "Recently")),
+                    progress_percentage=50,
+                    items=[]
+                )
+        except Exception:
+            pass
+
+    # 2. Check active demo orders registry
+    if cleaned_num in DEMO_ORDERS:
+        return DEMO_ORDERS[cleaned_num]
+
+    # Partial/convenient matches for demo IDs (e.g. 9021 or 1002)
+    if "9021" in cleaned_num:
+        return DEMO_ORDERS["ORD-2026-9021"]
+    if "1002" in cleaned_num:
+        return DEMO_ORDERS["ORD-2026-1002"]
+
+    # 3. Order not found / not placed yet -> Return None
+    return None
 
 
 def execute_get_store_policy(topic: str) -> str:
     """Return official policy string."""
     t = topic.lower().strip()
     p = chatbot_settings.policies
-    if "return" in t or "replace" in t:
+    if any(k in t for k in ["fit", "fitting", "exchange", "size exchange", "size fit na ho", "badal"]):
+        return (
+            f"Size Exchange & Return: Agar shirt ka size fit na ho ya badalna ho, toh {p.store_name} par "
+            f"{p.return_window_days}-day free doorstep replacement suvidha uplabdh hai. "
+            f"Courier boy ghar se item pick karta hai aur sahi size deliver karta hai without any extra charge. "
+            f"Bas tags aur packing original honi chahiye."
+        )
+    elif "return" in t or "replace" in t:
         return f"Return Policy: {p.return_policy} Window: {p.return_window_days} days."
     elif "ship" in t or "deliver" in t:
         return f"Shipping Policy: {p.shipping_timeline} Rules: {p.shipping_fee_rule}"

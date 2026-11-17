@@ -81,16 +81,17 @@ class ChatbotAgent:
             "available colors", "color options", "aur color", "different colors", "shades", "colours"
         ])
 
-        # 3. Product search detection (e.g. 'shirt', 'black', 'buy', 'shoes', 'cotton', 'under')
-        is_product_query = not is_delivery_time_query and not is_size_query and not is_color_query and any(k in msg_lower for k in [
-            "shirt", "tshirt", "t-shirt", "cotton", "black", "blue", "navy", "white", "size",
-            "price", "dikhao", "buy", "product", "dress", "kurta", "jeans", "formal", "casual",
-            "sasta", "mehenga", "collection", "catalog", "under"
+        # 3. Policy detection (e.g. 'return', 'refund', 'policy', 'payment', 'cod', 'shipping', 'exchange', 'fit')
+        is_policy_query = not is_delivery_time_query and any(k in msg_lower for k in [
+            "return", "refund", "replace", "exchange", "charge", "payment", "cod", "upi", "policy",
+            "fit na ho", "fitting na", "size change", "badal", "size exchange"
         ])
 
-        # 4. Policy detection (e.g. 'return', 'refund', 'policy', 'payment', 'cod', 'shipping')
-        is_policy_query = not is_delivery_time_query and any(k in msg_lower for k in [
-            "return", "refund", "replace", "exchange", "charge", "payment", "cod", "upi", "policy"
+        # 4. Product search detection (MUST NOT conflict with policy/delivery/size/color)
+        is_product_query = not is_policy_query and not is_delivery_time_query and not is_size_query and not is_color_query and any(k in msg_lower for k in [
+            "shirt", "tshirt", "t-shirt", "cotton", "black", "blue", "navy", "white",
+            "price", "dikhao", "buy", "product", "dress", "kurta", "jeans", "formal", "casual",
+            "sasta", "mehenga", "collection", "catalog", "under", "party", "wear", "festive", "outfit", "kapde"
         ])
 
         # 5. Out of scope / domain deflection (e.g. coding, recipe, movies, general trivia)
@@ -106,9 +107,12 @@ class ChatbotAgent:
 
         # Execute appropriate tools based on intent
         if order_match:
-            order_num = order_match.group(1).upper()
+            order_num = order_match.group(0).upper().strip().lstrip("#")
             matched_order = await execute_get_order_status(order_num, db_session)
-            quick_suggestions = ["View Invoice", "Delivery Address", "Need Help with Order"]
+            if matched_order:
+                quick_suggestions = ["View Invoice", "Delivery Address", "Need Help with Order"]
+            else:
+                quick_suggestions = ["📦 Track Demo Order", "👕 Black Shirts under ₹1000", "💬 Customer Support", "🔄 7-Day Return Policy"]
         elif is_order_tracking_query and not order_match:
             quick_suggestions = ["How do I find Order ID?", "Need Help with Order", "7-Day Return Policy"]
 
@@ -136,11 +140,21 @@ class ChatbotAgent:
             quick_suggestions = ["View Size Guide", "Check Delivery Time", "Available Colors"]
 
         if is_policy_query and not quick_suggestions:
-            quick_suggestions = ["7-Day Return Policy", "Free Shipping Info", "Payment Modes"]
+            if any(k in msg_lower for k in ["fit", "fitting", "exchange", "size"]):
+                quick_suggestions = ["📏 View Size Guide", "👕 Black Shirts under ₹1000", "🚚 Check Delivery Time"]
+            else:
+                quick_suggestions = ["7-Day Return Policy", "Free Shipping Info", "Payment Modes"]
 
         # Fast Path: Deterministic store policies, delivery timelines, size guides, and order tracking
         # These are fixed facts that return in < 5ms without waiting for an external LLM network roundtrip
-        is_fast_path = is_delivery_time_query or is_size_query or is_color_query or is_policy_query or bool(order_match)
+        is_fast_path = (
+            is_delivery_time_query or 
+            is_size_query or 
+            is_color_query or 
+            is_policy_query or 
+            bool(order_match) or 
+            (is_order_tracking_query and not order_match)
+        )
 
         # Call real Gemini API for open-ended product queries and general conversation
         if not is_fast_path and not offline_mode and self.api_key and len(self.api_key) > 10:
@@ -171,6 +185,24 @@ class ChatbotAgent:
                 f"• **Estimated Delivery:** {matched_order.shipping_eta}\n"
                 f"• **Total Amount:** ₹{matched_order.total:.2f} ({matched_order.payment_status})"
             )
+        elif order_match and not matched_order:
+            order_id_clean = order_match.group(0).upper().strip().lstrip("#")
+            if is_english:
+                reply_parts.append(
+                    f"❌ **Order #{order_id_clean} Not Found**\n\n"
+                    f"We could not find any active order matching this ID in our system. This usually happens if:\n"
+                    f"1. **No order has been placed yet** under this number.\n"
+                    f"2. There is a small typo in the Order ID.\n\n"
+                    f"💡 *Tip: If you'd like to test live order tracking, try demo order **`ORD-2026-9021`** or **`ORD-2026-1002`**.*"
+                )
+            else:
+                reply_parts.append(
+                    f"❌ **Order #{order_id_clean} Ka Record Nahi Mila**\n\n"
+                    f"Hamare system me is Order ID se koi active order registered nahi mila. Yeh do reasons se ho sakta hai:\n"
+                    f"1. **Abhi tak is ID se koi order place nahi hua hai.**\n"
+                    f"2. Order ID enter karne me koi typo ya galat number enter ho gaya hai.\n\n"
+                    f"💡 *Agar aap tracking feature test karna chahte hain, toh demo order **`ORD-2026-9021`** ya **`ORD-2026-1002`** enter karke live status dekh sakte hain!*"
+                )
         elif is_order_tracking_query and not order_match:
             if is_english:
                 reply_parts.append(
