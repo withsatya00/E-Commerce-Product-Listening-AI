@@ -1636,11 +1636,21 @@ export class ApiClient {
   async request<T>(method: string, path: string, body?: unknown, retry = true): Promise<T> {
     const isForm = body instanceof FormData;
     try {
-      const res = await this.fetchFn(`${this.baseUrl}/api/v1${path}`, {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 2000);
+      const url =
+        typeof window !== "undefined" && !process.env.NEXT_PUBLIC_API_URL
+          ? `/api/v1${path}`
+          : `${this.baseUrl}/api/v1${path}`;
+
+      const res = await this.fetchFn(url, {
         method,
+        signal: controller.signal,
         headers: this.headers(body),
         body: body === undefined ? undefined : isForm ? (body as FormData) : JSON.stringify(body),
       });
+      clearTimeout(timeoutId);
+
       if (res.status === 401 && retry && !path.startsWith("/auth/")) {
         if (await this.refresh()) return this.request<T>(method, path, body, false);
         useSession.getState().clear();

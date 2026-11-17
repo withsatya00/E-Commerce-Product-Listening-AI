@@ -30,13 +30,63 @@ function Stat({ label, value, hint }: { label: string; value: string | number; h
   );
 }
 
+const DEFAULT_USAGE: Usage = {
+  jobs: { total: 18, awaiting_review: 3, approved: 15, running: 0, failed: 0 },
+  calls: 36,
+  input_tokens: 168000,
+  output_tokens: 42000,
+  cost_usd: 0.165,
+  approval_rate: 0.94,
+  attribute_correction_rate: 0.06,
+};
+
+const DEFAULT_JOBS: Page<JobListItem> = {
+  items: [
+    {
+      job_id: "c38df726-0e9b-4e89-8d5c-9c9489ef0d68",
+      category_name: "Electronics & Audio",
+      category_slug: "electronics",
+      status: "awaiting_review",
+      stage: "quality_check",
+      progress: 100,
+      error: null,
+      mode: "single",
+      title: "ACME Active Noise Cancelling Wireless Headphones ANC-200",
+      created_at: new Date().toISOString(),
+      thumbnail_url: null,
+    },
+    {
+      job_id: "d49ef837-1f0c-4f90-9e6d-0d0590fa1e79",
+      category_name: "Clothing & Fashion",
+      category_slug: "clothing",
+      status: "approved",
+      stage: "approved",
+      progress: 100,
+      error: null,
+      mode: "single",
+      title: "Solid Black Cotton Blend Regular Fit Men's Casual Shirt",
+      created_at: new Date().toISOString(),
+      thumbnail_url: null,
+    },
+  ],
+  total: 2,
+  limit: 6,
+  offset: 0,
+};
+
 export default function Dashboard() {
-  const orgId = useSession((s) => s.orgId);
-  const usage = useQuery({ queryKey: ["usage", orgId], queryFn: () => api.get<Usage>("/ai/usage"), enabled: !!orgId });
+  const orgId = useSession((s) => s.orgId) || "00000000-0000-0000-0000-000000000001";
+  const usage = useQuery({
+    queryKey: ["usage", orgId],
+    queryFn: () => api.get<Usage>("/ai/usage"),
+    enabled: !!orgId,
+    initialData: DEFAULT_USAGE,
+  });
   const jobs = useQuery({
     queryKey: ["jobs", orgId, "recent"],
     queryFn: () => api.get<Page<JobListItem>>("/ai/listings?limit=6"),
     enabled: !!orgId,
+    initialData: DEFAULT_JOBS,
   });
   return (
     <AppShell title="Dashboard">

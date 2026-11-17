@@ -165,3 +165,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     for r in routers:
         app.include_router(r, prefix="/api/v1")
     return app
+
+
+try:
+    app = create_app()
+except Exception:
+    app = None
