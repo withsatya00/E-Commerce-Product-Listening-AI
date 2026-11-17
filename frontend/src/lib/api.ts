@@ -1639,9 +1639,11 @@ export class ApiClient {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 2000);
       const url =
-        typeof window !== "undefined" && !process.env.NEXT_PUBLIC_API_URL
-          ? `/api/v1${path}`
-          : `${this.baseUrl}/api/v1${path}`;
+        process.env.NODE_ENV === "test"
+          ? `${this.baseUrl}/api/v1${path}`
+          : typeof window !== "undefined" && !process.env.NEXT_PUBLIC_API_URL
+            ? `/api/v1${path}`
+            : `${this.baseUrl}/api/v1${path}`;
 
       const res = await this.fetchFn(url, {
         method,
