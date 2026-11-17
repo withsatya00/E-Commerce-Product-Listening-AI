@@ -23,13 +23,8 @@ export function ChatWindow({ onClose, apiUrl }: ChatWindowProps) {
       id: "welcome-1",
       role: "assistant",
       content:
-        "Namaste! 🙏 Welcome to **TradeExpress**.\n\nI can help you discover products, track live shipments, or answer store policies in **English** or **हिंदी / Hinglish**! How can I assist you today?",
-      quickSuggestions: [
-        "📦 Track an Order",
-        "👕 Black Shirts under ₹1000",
-        "🔄 7-Day Return Policy",
-        "🚚 Check Delivery Time",
-      ],
+        "Namaste! 🙏 Welcome to **TradeExpress**.\n\nI can help you discover products, track live shipments, or answer store policies in **English** or **हिंदी / Hinglish**.\n\nWhat can I assist you with today?",
+      quickSuggestions: [],
       timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
     },
   ]);
@@ -94,7 +89,23 @@ export function ChatWindow({ onClose, apiUrl }: ChatWindowProps) {
   }, []);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (messages.length <= 1) return;
+    const lastMsg = messages[messages.length - 1];
+
+    if (lastMsg.role === "assistant") {
+      // Auto-scroll to the top/beginning of the newly arrived AI response
+      // so the user reads from the first line and NEVER has to scroll up!
+      setTimeout(() => {
+        const el = document.getElementById(`msg-${lastMsg.id}`);
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth", block: "start" });
+        } else {
+          messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+        }
+      }, 50);
+    } else {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
   }, [messages, isLoading]);
 
   const handleSend = async (messageText: string) => {
@@ -233,7 +244,8 @@ export function ChatWindow({ onClose, apiUrl }: ChatWindowProps) {
         {messages.map((m, mIdx) => (
           <div
             key={m.id}
-            className={`flex flex-col ${m.role === "user" ? "items-end" : "items-start"}`}
+            id={`msg-${m.id}`}
+            className={`flex flex-col scroll-mt-2 ${m.role === "user" ? "items-end" : "items-start"}`}
           >
             <div
               className={`max-w-[88%] rounded-2xl px-4 py-3 text-xs leading-relaxed shadow-xs transition-all ${
@@ -245,51 +257,59 @@ export function ChatWindow({ onClose, apiUrl }: ChatWindowProps) {
               <FormattedMessage content={m.content} isUser={m.role === "user"} />
             </div>
 
-            {/* If welcome message and first load, show 4 quick action cards */}
+            {/* If welcome message and first load, show 4 clean quick action cards */}
             {mIdx === 0 && messages.length === 1 && (
-              <div className="grid grid-cols-2 gap-2 w-full mt-3">
+              <div className="grid grid-cols-2 gap-2 w-full mt-2.5">
                 <button
                   onClick={() => handleSend("Track an Order")}
-                  className="flex flex-col items-start p-2.5 bg-white hover:bg-indigo-50/60 border border-slate-200 hover:border-indigo-200 rounded-xl transition-all text-left group shadow-2xs"
+                  className="flex items-center gap-2.5 p-2.5 bg-white hover:bg-indigo-50/70 border border-slate-200/90 hover:border-indigo-300 rounded-xl transition-all text-left group shadow-xs active:scale-95"
                 >
-                  <span className="text-base mb-1">📦</span>
-                  <span className="text-xs font-semibold text-slate-800 group-hover:text-indigo-600">
-                    Track Order
-                  </span>
-                  <span className="text-[10px] text-slate-400">Live courier ETA</span>
+                  <span className="text-xl">📦</span>
+                  <div>
+                    <span className="text-xs font-semibold text-slate-800 group-hover:text-indigo-600 block leading-tight">
+                      Track Order
+                    </span>
+                    <span className="text-[10px] text-slate-400">Live courier status</span>
+                  </div>
                 </button>
 
                 <button
                   onClick={() => handleSend("Black Shirts under ₹1000")}
-                  className="flex flex-col items-start p-2.5 bg-white hover:bg-indigo-50/60 border border-slate-200 hover:border-indigo-200 rounded-xl transition-all text-left group shadow-2xs"
+                  className="flex items-center gap-2.5 p-2.5 bg-white hover:bg-indigo-50/70 border border-slate-200/90 hover:border-indigo-300 rounded-xl transition-all text-left group shadow-xs active:scale-95"
                 >
-                  <span className="text-base mb-1">👕</span>
-                  <span className="text-xs font-semibold text-slate-800 group-hover:text-indigo-600">
-                    Find Clothes
-                  </span>
-                  <span className="text-[10px] text-slate-400">Under ₹1,000</span>
+                  <span className="text-xl">👕</span>
+                  <div>
+                    <span className="text-xs font-semibold text-slate-800 group-hover:text-indigo-600 block leading-tight">
+                      Find Clothes
+                    </span>
+                    <span className="text-[10px] text-slate-400">Under ₹1,000</span>
+                  </div>
                 </button>
 
                 <button
                   onClick={() => handleSend("What is your return policy?")}
-                  className="flex flex-col items-start p-2.5 bg-white hover:bg-indigo-50/60 border border-slate-200 hover:border-indigo-200 rounded-xl transition-all text-left group shadow-2xs"
+                  className="flex items-center gap-2.5 p-2.5 bg-white hover:bg-indigo-50/70 border border-slate-200/90 hover:border-indigo-300 rounded-xl transition-all text-left group shadow-xs active:scale-95"
                 >
-                  <span className="text-base mb-1">🔄</span>
-                  <span className="text-xs font-semibold text-slate-800 group-hover:text-indigo-600">
-                    7-Day Return
-                  </span>
-                  <span className="text-[10px] text-slate-400">Refund details</span>
+                  <span className="text-xl">🔄</span>
+                  <div>
+                    <span className="text-xs font-semibold text-slate-800 group-hover:text-indigo-600 block leading-tight">
+                      7-Day Return
+                    </span>
+                    <span className="text-[10px] text-slate-400">Hassle-free refund</span>
+                  </div>
                 </button>
 
                 <button
-                  onClick={() => handleSend("Tell me about wholesale bulk rates")}
-                  className="flex flex-col items-start p-2.5 bg-white hover:bg-indigo-50/60 border border-slate-200 hover:border-indigo-200 rounded-xl transition-all text-left group shadow-2xs"
+                  onClick={() => handleSend("Check Delivery Time")}
+                  className="flex items-center gap-2.5 p-2.5 bg-white hover:bg-indigo-50/70 border border-slate-200/90 hover:border-indigo-300 rounded-xl transition-all text-left group shadow-xs active:scale-95"
                 >
-                  <span className="text-base mb-1">💼</span>
-                  <span className="text-xs font-semibold text-slate-800 group-hover:text-indigo-600">
-                    B2B Wholesale
-                  </span>
-                  <span className="text-[10px] text-slate-400">Tiered savings</span>
+                  <span className="text-xl">🚚</span>
+                  <div>
+                    <span className="text-xs font-semibold text-slate-800 group-hover:text-indigo-600 block leading-tight">
+                      Delivery Time
+                    </span>
+                    <span className="text-[10px] text-slate-400">Free over ₹999</span>
+                  </div>
                 </button>
               </div>
             )}
@@ -318,8 +338,8 @@ export function ChatWindow({ onClose, apiUrl }: ChatWindowProps) {
               </div>
             )}
 
-            {/* Quick Suggestions Chips */}
-            {m.quickSuggestions && m.quickSuggestions.length > 0 && (
+            {/* Quick Suggestions Chips (only for follow-up responses, never on the initial welcome screen) */}
+            {m.quickSuggestions && m.quickSuggestions.length > 0 && !(mIdx === 0 && messages.length === 1) && (
               <div className="flex flex-wrap gap-1.5 mt-2.5">
                 {m.quickSuggestions.map((chip, idx) => (
                   <button

@@ -158,6 +158,7 @@
     --tracking-tight: -.025em;
     --tracking-wide: .025em;
     --tracking-wider: .05em;
+    --leading-tight: 1.25;
     --leading-snug: 1.375;
     --leading-relaxed: 1.625;
     --radius-xs: .125rem;
@@ -920,6 +921,10 @@
 
   .cursor-pointer {
     cursor: pointer;
+  }
+
+  .scroll-mt-2 {
+    scroll-margin-top: calc(var(--spacing) * 2);
   }
 
   .scrollbar-thin {
@@ -2031,6 +2036,11 @@
     line-height: var(--leading-snug);
   }
 
+  .leading-tight {
+    --tw-leading: var(--leading-tight);
+    line-height: var(--leading-tight);
+  }
+
   .font-bold {
     --tw-font-weight: var(--font-weight-bold);
     font-weight: var(--font-weight-bold);
@@ -2533,10 +2543,6 @@
   }
 
   @media (hover: hover) {
-    .hover\:border-indigo-200:hover {
-      border-color: var(--color-indigo-200);
-    }
-
     .hover\:border-indigo-300:hover {
       border-color: var(--color-indigo-300);
     }
@@ -2561,13 +2567,13 @@
       background-color: var(--color-indigo-50);
     }
 
-    .hover\:bg-indigo-50\/60:hover {
-      background-color: #eef2ff99;
+    .hover\:bg-indigo-50\/70:hover {
+      background-color: #eef2ffb3;
     }
 
     @supports (color: color-mix(in lab, red, red)) {
-      .hover\:bg-indigo-50\/60:hover {
-        background-color: color-mix(in oklab, var(--color-indigo-50) 60%, transparent);
+      .hover\:bg-indigo-50\/70:hover {
+        background-color: color-mix(in oklab, var(--color-indigo-50) 70%, transparent);
       }
     }
 
