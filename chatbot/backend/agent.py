@@ -256,8 +256,8 @@ class ChatbotAgent:
         elif is_greeting:
             if is_english:
                 reply_parts.append(
-                    "Hello! 🙏 Welcome to **TradeExpress**.\n\n"
-                    "I am your personal shopping assistant. I can help you discover products, track live shipments, or explain return & shipping policies. How can I help you today?"
+                    "Welcome to **TradeExpress** ✨\n\n"
+                    "Your personal shopping assistant for product discovery, live order tracking, and store queries. How may I assist you today?"
                 )
                 quick_suggestions = ["📦 Track an Order", "👕 Black Shirts under ₹1000", "🔄 7-Day Return Policy", "💼 Wholesale Bulk Rates"]
             else:

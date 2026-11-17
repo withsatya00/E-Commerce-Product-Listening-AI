@@ -23,7 +23,7 @@ export function ChatWindow({ onClose, apiUrl }: ChatWindowProps) {
       id: "welcome-1",
       role: "assistant",
       content:
-        "Namaste! 🙏 Welcome to **TradeExpress**.\n\nI can help you discover products, track live shipments, or answer store policies in **English** or **हिंदी / Hinglish**.\n\nWhat can I assist you with today?",
+        "Welcome to **TradeExpress** ✨\n\nYour personal shopping assistant for product discovery, live order tracking, and store queries. How may I assist you today?",
       quickSuggestions: [],
       timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
     },
