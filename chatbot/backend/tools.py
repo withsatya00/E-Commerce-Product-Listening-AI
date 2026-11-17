@@ -95,6 +95,32 @@ SAMPLE_PRODUCTS: List[ProductCardItem] = [
         rating=4.7,
         variants=[{"type": "Size", "options": ["S", "M", "L", "XL", "XXL"]}]
     ),
+    ProductCardItem(
+        id="prod-004",
+        name="Men's Solid Black Bio-Washed Cotton Casual Shirt",
+        slug="mens-black-bio-washed-cotton-casual-shirt",
+        sku="SHIRT-BLK-BIO-004",
+        price=449.0,
+        currency="INR",
+        photo="/api/v1/images/sample-shirt.jpg",
+        stock=120,
+        category_slug="mens-clothing",
+        rating=4.8,
+        variants=[{"type": "Size", "options": ["S", "M", "L", "XL"]}]
+    ),
+    ProductCardItem(
+        id="prod-005",
+        name="Men's Black Regular Fit Cotton Henley Casual Shirt",
+        slug="mens-black-cotton-henley-shirt",
+        sku="SHIRT-HEN-BLK-005",
+        price=499.0,
+        currency="INR",
+        photo="/api/v1/images/sample-shirt.jpg",
+        stock=80,
+        category_slug="mens-clothing",
+        rating=4.7,
+        variants=[{"type": "Size", "options": ["M", "L", "XL"]}]
+    ),
 ]
 
 
@@ -138,19 +164,42 @@ async def execute_search_products(
     if not results:
         results = list(SAMPLE_PRODUCTS)
 
+    # Detect color from query if not explicitly passed
+    color_in_query = None
+    for c in ["black", "blue", "navy", "white", "red", "green", "grey", "gray"]:
+        if c in q_lower:
+            color_in_query = c
+            break
+
+    target_color = color.lower() if color else color_in_query
+
     filtered = []
     for item in results:
         name_lower = item.name.lower()
+        if target_color and target_color not in name_lower:
+            # Check if color is in variants
+            has_color_variant = False
+            if item.variants and isinstance(item.variants, list):
+                for v in item.variants:
+                    if isinstance(v, dict) and v.get("type", "").lower() == "color":
+                        options = [str(o).lower() for o in v.get("options", [])]
+                        if any(target_color in opt for opt in options):
+                            has_color_variant = True
+            if not has_color_variant:
+                continue
+
         if max_price and item.price > max_price:
             continue
         if min_price and item.price < min_price:
             continue
-        if color and color.lower() not in name_lower:
-            # Check variants
-            pass
         filtered.append(item)
 
-    return filtered[:4] if filtered else results[:2]
+    if filtered:
+        return filtered[:4]
+
+    # If no item strictly matched the budget, return closest items sorted by price
+    closest = [item for item in results if not target_color or target_color in item.name.lower()]
+    return closest[:3] if closest else results[:3]
 
 
 async def execute_get_order_status(

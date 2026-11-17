@@ -67,9 +67,12 @@ class ChatbotAgent:
             quick_suggestions = ["Track ORD-2026-9021", "How do I find Order ID?", "Return an item"]
 
         if is_product_query:
-            # Extract basic price filter if present (e.g. 'under 1000' or 'under 999')
-            price_match = re.search(r"(?:under|below|less than|max)\s*(?:rs\.?|inr|₹)?\s*(\d+)", msg_lower)
-            max_price = float(price_match.group(1)) if price_match else None
+            # Extract price/budget filter supporting English & Hinglish (e.g. 'under 1000', '500 ke andar', '1500 tak')
+            price_match = re.search(
+                r"(?:under|below|less than|max|budget)\s*(?:rs\.?|inr|₹)?\s*(\d{2,6})|\b(\d{2,6})\s*(?:ke\s*an[a-z]+r|tak|k\s*andar|rupaye|\/-)",
+                msg_lower
+            )
+            max_price = float(price_match.group(1) or price_match.group(2)) if price_match else None
             matched_products = await execute_search_products(
                 query=user_message,
                 max_price=max_price,
@@ -111,10 +114,23 @@ class ChatbotAgent:
                 "Main turant live carrier tracking aur delivery ETA check karke bata dunga!"
             )
         elif matched_products:
-            reply_parts.append(
-                f"Aapki pasand ke hisaab se humne top recommendations dhundhi hain! Niche diye gaye cards me aap photos, "
-                f"real price (₹), aur available sizes check kar sakte hain:"
-            )
+            matched_budget = [p for p in matched_products if max_price and p.price <= max_price]
+            if max_price and matched_budget:
+                reply_parts.append(
+                    f"Aapke **₹{int(max_price)}** budget ke andar humne best options dhundh liye hain! "
+                    f"Niche diye gaye cards me aap photos, real price (₹), aur available sizes check kar sakte hain:"
+                )
+            elif max_price and not matched_budget:
+                min_avail = min(p.price for p in matched_products)
+                reply_parts.append(
+                    f"Filhaal ₹{int(max_price)} ke andar direct match nahi mila, lekin sabse affordable best quality option "
+                    f"**₹{int(min_avail)}** se available hai. Niche aap closest recommendations dekh sakte hain:"
+                )
+            else:
+                reply_parts.append(
+                    "Aapki pasand ke hisaab se humne top recommendations dhundhi hain! Niche diye gaye cards me aap photos, "
+                    "real price (₹), aur available sizes check kar sakte hain:"
+                )
         elif is_policy_query:
             policy_text = execute_get_store_policy(msg_lower)
             reply_parts.append(
